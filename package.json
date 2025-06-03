@@ -1,0 +1,6 @@
+{
+  "name": "vercel-serverless",
+  "version": "1.0.0",
+  "main": "api/hubspot-proxy.js",
+  "type": "module"
+}
