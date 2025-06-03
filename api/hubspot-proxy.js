@@ -1,6 +1,9 @@
 // /api/hubspot-proxy.js
 
 export default async function handler(req, res) {
+    console.log('[HANDLER STARTED]', req.method, req.headers);
+
+export default async function handler(req, res) {
     try {
         // Only allow POST requests
         if (req.method !== 'POST') {
@@ -85,4 +88,6 @@ export default async function handler(req, res) {
         console.error('[FATAL ERROR]', error);
         return res.status(500).json({ error: 'Server Error', details: error.message });
     }
+}
+
 }
