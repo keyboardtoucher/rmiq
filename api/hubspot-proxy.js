@@ -1,46 +1,67 @@
 // /api/hubspot-proxy.js
 
-module.exports = async (req, res) => {
-    console.log('--- NEW REQUEST ---');
-    console.log('METHOD:', req.method);
-    console.log('HEADERS:', req.headers);
+export default async function handler(req, res) {
+    console.log('[HANDLER STARTED]', req.method, req.headers, req.url);
 
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', async () => {
-        console.log('RAW BODY:', body);
+    return res.status(200).json({ status: 'ping' });
+}
 
-        let email;
-        try {
-            // Try parse JSON
-            const parsed = JSON.parse(body);
-            email = parsed.email || parsed.Email;
-            console.log('PARSED EMAIL:', email);
-        } catch (e) {
-            console.log('JSON PARSE ERROR:', e.message);
+export default async function handler(req, res) {
+    try {
+        // Only allow POST requests
+        if (req.method !== 'POST') {
+            console.error('[ERROR] Method Not Allowed:', req.method);
+            return res.status(405).json({ error: 'Method Not Allowed' });
         }
 
+        let email = undefined;
+        const contentType = req.headers['content-type'] || '';
+        let rawBody = '';
+
+        // Parse request body depending on content type
+        if (contentType.includes('application/json')) {
+            // If JSON, use req.body directly
+            email = req.body.email || req.body.Email;
+            rawBody = JSON.stringify(req.body);
+        } else if (contentType.includes('application/x-www-form-urlencoded')) {
+            // If form data, manually read the body and parse as URL-encoded
+            rawBody = await new Promise((resolve, reject) => {
+                let data = '';
+                req.on('data', chunk => { data += chunk });
+                req.on('end', () => resolve(data));
+            });
+            const params = new URLSearchParams(rawBody);
+            email = params.get('email') || params.get('Email');
+        }
+
+        // Log the incoming request body and parsed email
+        console.log(`[INFO] Received request: BODY: ${rawBody} | EMAIL: ${email}`);
+
+        // Validate that email was provided
         if (!email) {
-            console.log('NO EMAIL!');
-            res.statusCode = 400;
-            res.setHeader('Content-Type', 'application/json');
-            return res.end(JSON.stringify({ error: 'Email is required' }));
+            console.error('[ERROR] No email provided. Body:', rawBody);
+            return res.status(400).json({ error: 'Email is required' });
         }
 
-        // Prepare payload for HubSpot
+        // Prepare HubSpot payload in the format required by their API
         const hubspotData = {
             fields: [
                 { name: 'email', value: email }
             ]
         };
 
-        // Your HubSpot portal ID and form ID
-        const portalId = '49350138';
-        const formId = '6668b052-3b43-4308-a222-5d5087ac3bf7';
+        // Log the HubSpot payload before sending
+        console.log(`[INFO] Sending to HubSpot:`, JSON.stringify(hubspotData));
 
-        // Send request to HubSpot
+        // Set your HubSpot portal ID and form ID
+        const portalId = '49350138';
+        const formId = '6668b052-3b43-4308-a222-5d5087ac3bf7'; // Use your actual form ID here
+
+        // Try to send the data to HubSpot API
+        let hubspotResp;
+        let hubspotRespText = '';
         try {
-            const hubspotResp = await fetch(
+            hubspotResp = await fetch(
                 `https://api.hsforms.com/submissions/v3/integration/submit/${portalId}/${formId}`,
                 {
                     method: 'POST',
@@ -48,15 +69,26 @@ module.exports = async (req, res) => {
                     body: JSON.stringify(hubspotData)
                 }
             );
-            console.log('HUBSPOT STATUS:', hubspotResp.status);
-            res.statusCode = 200;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ status: 'ok', hubspotStatus: hubspotResp.status }));
-        } catch (err) {
-            console.log('HUBSPOT ERROR:', err.message);
-            res.statusCode = 500;
-            res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ error: 'HubSpot Error', details: err.message }));
+            // Read the response body from HubSpot
+            hubspotRespText = await hubspotResp.text();
+        } catch (hubspotError) {
+            // Log and return errors related to the fetch request to HubSpot
+            console.error('[ERROR] Fetch to HubSpot failed:', hubspotError);
+            return res.status(502).json({ error: 'Failed to contact HubSpot', details: hubspotError.message });
         }
-    });
-};
+
+        // Log the response from HubSpot (status code and body)
+        console.log(`[INFO] HubSpot response: Status ${hubspotResp.status}, Body: ${hubspotRespText}`);
+
+        // Final success log for tracking processed emails
+        console.log(`[SUCCESS] Email ${email} processed successfully (Status: ${hubspotResp.status})`);
+
+        // Respond to the frontend (Elementor, Framer, etc.)
+        return res.status(200).json({ status: 'ok', hubspotStatus: hubspotResp.status });
+
+    } catch (error) {
+        // Log any unexpected server-side errors
+        console.error('[FATAL ERROR]', error);
+        return res.status(500).json({ error: 'Server Error', details: error.message });
+    }
+}
