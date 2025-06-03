@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
         // Your HubSpot portal ID and form ID
         const portalId = '49350138';
-        const formId = '34e375be-bdc6-4f26-bb3e-f9f73a113d8c';
+        const formId = '6668b052-3b43-4308-a222-5d5087ac3bf7'; // formname on site: rmiqcollect
 
         // Send request to HubSpot
         const hubspotResp = await fetch(
