@@ -1,7 +1,10 @@
 // /api/hubspot-proxy.js
 
 export default async function handler(req, res) {
-    console.log('[HANDLER STARTED]', req.method, req.headers);
+    console.log('[HANDLER STARTED]', req.method, req.headers, req.url);
+
+    return res.status(200).json({ status: 'ping' });
+}
 
 export default async function handler(req, res) {
     try {
@@ -88,6 +91,4 @@ export default async function handler(req, res) {
         console.error('[FATAL ERROR]', error);
         return res.status(500).json({ error: 'Server Error', details: error.message });
     }
-}
-
 }
