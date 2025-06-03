@@ -1,11 +1,6 @@
 // /api/hubspot-proxy.js
 
-export default async function handler(req, res) {
-    console.log('[HANDLER STARTED]', req.method, req.headers, req.url);
-
-    return res.status(200).json({ status: 'ping' });
-}
-
+// Main API handler for the HubSpot proxy endpoint
 export default async function handler(req, res) {
     try {
         // Only allow POST requests
